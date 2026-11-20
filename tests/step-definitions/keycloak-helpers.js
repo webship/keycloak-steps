@@ -15,6 +15,9 @@
 // window, so a second code in the same window waits for the next one.
 
 const crypto = require('crypto');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { friendly, smartSettle } = require('webship-js/tests/step-definitions/webship');
 const { request: playwrightRequest } = require('playwright');
 
@@ -536,20 +539,43 @@ function totp(key, step, { digits = 6, algorithm = 'sha1' } = {}) {
   return String(value % (10 ** digits)).padStart(digits, '0');
 }
 
-// The time steps whose code this run used, by key: the server takes a code once, so a second sign-in in the
-// same window waits for the next one, as a person with an authenticator app does.
+// The time steps whose code was used, by key: the server takes a code once, so a second sign-in in the same
+// window waits for the next one, as a person with an authenticator app does. They are kept for this run and,
+// for the runs after it on this machine, in a small file of the temporary folder named by a hash of the key
+// (never the key itself): a run that starts within the window of the one before knows its code was taken.
 const USED_STEPS = new Map();
 
+/** A name for a key that does not give the key away: the start of the SHA-256 of its bytes. */
+function keyId(key) {
+  return crypto.createHash('sha256').update(base32Bytes(key)).digest('hex').slice(0, 24);
+}
+
+function usedFile(id) {
+  return path.join(os.tmpdir(), `webship-keycloak-steps-otp-${id}.json`);
+}
+
+/** The last time step whose code was used, in this run or in an earlier one on this machine (0: none). */
+function lastUsedStep(id) {
+  let step = USED_STEPS.get(id) || 0;
+  try { step = Math.max(step, Number(JSON.parse(fs.readFileSync(usedFile(id), 'utf8')).step) || 0); } catch { /* no file yet */ }
+  return step;
+}
+
+function markUsed(id, step) {
+  USED_STEPS.set(id, step);
+  try { fs.writeFileSync(usedFile(id), JSON.stringify({ step })); } catch { /* a read-only temporary folder: this run still knows */ }
+}
+
 /**
- * A fresh code of a key: the current window's, or the next window's once this run used the current one
- * (waiting for that window to start). `period` in seconds.
+ * A fresh code of a key: the current window's, or the next window's once the current one's was used (waiting
+ * for that window to start). `period` in seconds.
  */
 async function freshCode(world, key, { period = 30, digits = 6, algorithm = 'sha1' } = {}) {
-  const id = base32Bytes(key).toString('hex');
+  const id = keyId(key);
   for (;;) {
     const step = Math.floor(Date.now() / 1000 / period);
-    if (!(USED_STEPS.get(id) >= step)) {
-      USED_STEPS.set(id, step);
+    if (!(lastUsedStep(id) >= step)) {
+      markUsed(id, step);
       return totp(key, step, { digits, algorithm });
     }
     const wait = (step + 1) * period * 1000 - Date.now() + 100;
@@ -560,8 +586,25 @@ async function freshCode(world, key, { period = 30, digits = 6, algorithm = 'sha
 /** Note that a code of a key was used now (a code a step typed, or one the page set up). */
 function codeUsed(key, period = 30) {
   try {
-    USED_STEPS.set(base32Bytes(key).toString('hex'), Math.floor(Date.now() / 1000 / period));
+    markUsed(keyId(key), Math.floor(Date.now() / 1000 / period));
   } catch { /* not a key */ }
+}
+
+/**
+ * Type the code a key gives now on the page that asks for it (after the password, or the set-up page) and send
+ * it. When the page asks again, the code was taken already (by another machine, or a person with the same key
+ * on their phone): the next window's code is typed once, as a person does when their code is refused; a second
+ * refusal fails the step with the server's words. `submit` sends the form.
+ */
+async function enterComputedCode(world, key, { settings = {}, submit } = {}) {
+  const asking = ['one-time code', 'set up a one-time code'];
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await (await needField(world, 'One-time code')).fill(await freshCode(world, key, settings));
+    await submit();
+    if (!asking.includes(await loginPage(world))) return;
+  }
+  const messages = await pageMessages(world.page);
+  throw fail(world, `The server refused two codes in a row worked out from the key${messages.length ? `: it says ${listed(messages)}` : ''}.`, 'The key in the users registry (otpSecret) must be the account\'s: the base32 key an authenticator app is given. Check also that the clock of this machine is right; a code is valid for one window of 30 seconds.');
 }
 
 // ---------------------------------------------------------------------------
@@ -915,6 +958,7 @@ module.exports = {
   cutRequest,
   dropAllSessions,
   dropSession,
+  enterComputedCode,
   eventually,
   expectLoginPage,
   fail,

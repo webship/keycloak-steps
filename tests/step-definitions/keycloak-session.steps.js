@@ -90,8 +90,7 @@ async function sendLoginForm(world, login, password, { remember = false } = {}) 
 async function afterLoginForm(world, account) {
   let where = await h.loginPage(world);
   if (where === 'one-time code' && account.otpSecret) {
-    await (await h.needField(world, 'One-time code')).fill(await h.freshCode(world, account.otpSecret));
-    await h.submitLogin(world, ['Sign In', 'Log In', 'Submit']);
+    await h.enterComputedCode(world, account.otpSecret, { submit: () => h.submitLogin(world, ['Sign In', 'Log In', 'Submit']) });
     where = await h.loginPage(world);
   }
   return where;

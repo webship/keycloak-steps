@@ -49,8 +49,7 @@ When(/^(?:I|we) enter the one-time code of "([^"]*)"$/, { timeout: 120000 }, asy
   const account = h.resolveUser(this, handle);
   if (!account.otpSecret) throw h.fail(this, `The users registry has no otpSecret for "${handle}".`, `Set worldParameters.users.${handle}.otpSecret in cucumber.js to the account's key (base32, as an authenticator app gets it).`);
   await h.expectLoginPage(this, 'one-time code', 'The server asks for the code after the password ("When I submit the login form as "…"").');
-  await (await h.needField(this, 'One-time code')).fill(await h.freshCode(this, account.otpSecret));
-  await h.submitLogin(this, ['Sign In', 'Log In', 'Submit']);
+  await h.enterComputedCode(this, account.otpSecret, { submit: () => h.submitLogin(this, ['Sign In', 'Log In', 'Submit']) });
   if (!(await h.loginPage(this))) {
     await h.keepSession(this, handle);
     this.__signInUser = handle;
