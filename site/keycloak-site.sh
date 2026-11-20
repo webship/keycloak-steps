@@ -130,7 +130,7 @@ for verb in ${SITE_VERBS:-}; do
       eval "set -- $(value KCADM_ARGS)"
       kc "$@"
       status=$?
-      [ "$status" -ne 0 ] && exit "$status"
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
       ;;
     *)
       echo "keycloak-site.sh: no verb \"$verb\"." >&2
