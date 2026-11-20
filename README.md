@@ -200,7 +200,10 @@ A green first run prints every step, then the summary (the scenarios above and t
 and the HTML report it wrote:
 
 ```
-@@FIRST_RUN_OUTPUT@@
+3 scenarios (3 passed)
+11 steps (11 passed)
+0m12.496s (executing steps: 0m12.420s)
+[webship-js] HTML report → …/keycloak-tests/tests/reports/cucumber_report.html
 ```
 
 One feature runs alone when the command line names it (a scenario too, with its line):
