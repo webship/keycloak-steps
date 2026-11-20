@@ -111,10 +111,11 @@ for verb in ${SITE_VERBS:-}; do
           continue
         fi
         email="$(kc get "users/$id" -r "$REALM" --fields email --format csv --noquotes 2> /dev/null)"
-        roles="$(kc get-roles -r "$REALM" --uid "$id" --effective --fields name --format csv --noquotes 2> /dev/null | grep -v -E '^(default-roles-.*|offline_access|uma_authorization)$' | tr '\n' ' ')"
+        roles="$(kc get-roles -r "$REALM" --uid "$id" --effective --fields name --format csv --noquotes 2> /dev/null | grep -v -E '^(default-roles-.*|offline_access|uma_authorization)$' | paste -sd ' ' -)"
         admin="$(kc get-roles -r "$REALM" --uid "$id" --cclientid realm-management --fields name --format csv --noquotes 2> /dev/null | grep -x realm-admin)"
+        [ -n "$admin" ] && roles="${roles:+$roles }realm-admin"
         otp="$(kc get "users/$id/credentials" -r "$REALM" 2> /dev/null | grep -c '"type" : "otp"')"
-        printf '  %-16s %-32s roles: %s%s%s\n' "$username" "$email" "${roles:-none}" "${admin:+ realm-admin}" "$([ "${otp:-0}" -gt 0 ] && echo ', one-time code set up')"
+        printf '  %-16s %-32s roles: %s%s\n' "$username" "$email" "${roles:-none}" "$([ "${otp:-0}" -gt 0 ] && echo ', one-time code set up')"
       done <<< "$(value USERNAMES)"
       ;;
     realm)
