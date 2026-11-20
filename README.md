@@ -294,7 +294,9 @@ npm install --save-dev @webship-js/keycloak-steps
 - **One-time codes** are worked out from the account's key (RFC 6238: HMAC-SHA1, 6 digits, 30 seconds, or
   the settings the set-up page shows). The server takes a code once, so a second sign-in in the same
   30-second window waits for the next window, as a person with an authenticator app does: the only wait on
-  the clock, and it is the protocol's.
+  the clock, and it is the protocol's. The windows used are remembered across runs on the machine (a small
+  file of the temporary folder, named by a hash of the key), and a code the server refuses all the same
+  (another machine took it) is followed by the next window's code, once.
 - **Mail** is read from the mail catcher's API (Mailpit): only the mail that came since the scenario began
   or since the step that asked for it.
 - **A cut request says so.** When the browser lost a request (a network change on the machine, another
