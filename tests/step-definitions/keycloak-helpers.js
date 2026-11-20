@@ -541,29 +541,44 @@ function totp(key, step, { digits = 6, algorithm = 'sha1' } = {}) {
 
 // The time steps whose code was used, by key: the server takes a code once, so a second sign-in in the same
 // window waits for the next one, as a person with an authenticator app does. They are kept for this run and,
-// for the runs after it on this machine, in a small file of the temporary folder named by a hash of the key
-// (never the key itself): a run that starts within the window of the one before knows its code was taken.
+// for the runs after it on this machine, in one small file of the temporary folder: a hash of each key (never
+// the key itself) with its last window and the time that window ends. A run that starts within the window of
+// the one before knows its code was taken; the entries of windows that are over leave the file at each write.
 const USED_STEPS = new Map();
+const USED_FILE = path.join(os.tmpdir(), 'webship-keycloak-steps-otp.json');
 
 /** A name for a key that does not give the key away: the start of the SHA-256 of its bytes. */
 function keyId(key) {
   return crypto.createHash('sha256').update(base32Bytes(key)).digest('hex').slice(0, 24);
 }
 
-function usedFile(id) {
-  return path.join(os.tmpdir(), `webship-keycloak-steps-otp-${id}.json`);
+/** The windows of the file, by key id: { step, ends } (an empty object when there is no file, or no valid one). */
+function usedWindows() {
+  try {
+    const data = JSON.parse(fs.readFileSync(USED_FILE, 'utf8'));
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  } catch {
+    return {};
+  }
 }
 
 /** The last time step whose code was used, in this run or in an earlier one on this machine (0: none). */
 function lastUsedStep(id) {
-  let step = USED_STEPS.get(id) || 0;
-  try { step = Math.max(step, Number(JSON.parse(fs.readFileSync(usedFile(id), 'utf8')).step) || 0); } catch { /* no file yet */ }
-  return step;
+  const kept = usedWindows()[id];
+  return Math.max(USED_STEPS.get(id) || 0, (kept && Number(kept.step)) || 0);
 }
 
-function markUsed(id, step) {
+function markUsed(id, step, period) {
   USED_STEPS.set(id, step);
-  try { fs.writeFileSync(usedFile(id), JSON.stringify({ step })); } catch { /* a read-only temporary folder: this run still knows */ }
+  try {
+    const now = Date.now();
+    const windows = usedWindows();
+    for (const [other, kept] of Object.entries(windows)) {
+      if (!(kept && Number(kept.ends) > now)) delete windows[other];
+    }
+    windows[id] = { step, ends: (step + 1) * period * 1000 };
+    fs.writeFileSync(USED_FILE, JSON.stringify(windows));
+  } catch { /* a read-only temporary folder: this run still knows */ }
 }
 
 /**
@@ -575,7 +590,7 @@ async function freshCode(world, key, { period = 30, digits = 6, algorithm = 'sha
   for (;;) {
     const step = Math.floor(Date.now() / 1000 / period);
     if (!(lastUsedStep(id) >= step)) {
-      markUsed(id, step);
+      markUsed(id, step, period);
       return totp(key, step, { digits, algorithm });
     }
     const wait = (step + 1) * period * 1000 - Date.now() + 100;
@@ -586,7 +601,7 @@ async function freshCode(world, key, { period = 30, digits = 6, algorithm = 'sha
 /** Note that a code of a key was used now (a code a step typed, or one the page set up). */
 function codeUsed(key, period = 30) {
   try {
-    markUsed(keyId(key), Math.floor(Date.now() / 1000 / period));
+    markUsed(keyId(key), Math.floor(Date.now() / 1000 / period), period);
   } catch { /* not a key */ }
 }
 
