@@ -46,7 +46,7 @@ must fail; see [`.github/workflows/test.yml`](.github/workflows/test.yml).
 
 ## From nothing to a green run
 
-What the machine needs: Docker, [DDEV](https://ddev.com), git, Python 3, and Node.js 20 or later with
+What the machine needs: Docker, [DDEV](https://ddev.com), git, Python 3, and Node.js 24 or later with
 npm. The sign-in server runs in its container: no Java on the machine, no public domain and no account
 anywhere. The server needs about 850 MB of memory once it runs.
 
@@ -260,7 +260,7 @@ roles), and the server's REST APIs as such (webship-js's own API steps cover the
 
 ## Requirements
 
-- Node.js 20 or later
+- Node.js 24 or later
 - A webship-js 2.0 test project (webship-js 2.0.16 or later)
 - A Keycloak server (26.x) with a realm the app signs in with, and accounts for the suite (a realm admin
   among them, for the test-data steps)
