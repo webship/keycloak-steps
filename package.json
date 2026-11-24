@@ -1,6 +1,6 @@
 {
   "name": "@webship-js/keycloak-steps",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Cucumber step definitions for the sign-in of any app that uses Keycloak, a plugin for webship-js (Playwright and Cucumber): the login page and its refusals, \"Remember me\", the registration form's refusals, forgot password through the mail catcher, the required actions (update the password, verify the email, set up a one-time code), one-time codes worked out from the account's secret the way an authenticator app does, the consent screen, logout, the error pages, the account console (personal info, signing in, devices, applications), and the admin console (find and open a user, reset a test account's password, the realm's clients and roles).",
   "main": "tests/step-definitions/keycloak-session.steps.js",
   "files": [
